@@ -1,11 +1,58 @@
+# Dependencies
 node_modules/
+**/node_modules/
+
+# Frontend / backend build output
 dist/
+**/dist/
 build/
+coverage/
+.next/
+out/
+.vercel/
+*.tsbuildinfo
+
+# Secrets and local environment
 .env
+.env.*
+!.env.example
+!.env.*.example
+
+# Local databases and generated state
 .pgdata/
-*.log
-.taste-skill/
-.npm-cache/
-.mongo-test/
-.local-mongo/
 .legacy-postgres/
+.local-mongo/
+.mongo-test/
+*.sqlite
+*.sqlite3
+*.db
+
+# Local tools and caches
+.npm-cache/
+.taste-skill/
+.cache/
+.tmp/
+tmp/
+temp/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Internal product requirements (do not publish)
+prd.md
+PRD.md
+**/prd.md
+**/PRD.md
+
+# Private local AI configuration (remove if intentionally shared)
+.claude/
+.codex/

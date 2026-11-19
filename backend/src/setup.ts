@@ -76,7 +76,7 @@ async function setup() {
       await products.updateOne({ _id:'20000000-0000-4000-8000-'+item.id.padStart(12,'0') },{ $setOnInsert:{
         shop_id:productShop,name:item.name,category:item.category,condition:item.condition,description:item.description,
         condition_notes:item.condition_notes,inspection_notes:item.inspection_notes,price:item.price,stock:item.stock,
-        warranty_days:item.warranty_days,photo_url:item.photo_url,
+        warranty_days:item.warranty_days,
         created_at:new Date(),published:true,
       },$set:{ photo_url:item.photo_url } },{ upsert:true })
     }
