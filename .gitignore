@@ -1,0 +1,11 @@
+node_modules/
+dist/
+build/
+.env
+.pgdata/
+*.log
+.taste-skill/
+.npm-cache/
+.mongo-test/
+.local-mongo/
+.legacy-postgres/

@@ -1,0 +1,13 @@
+{
+  "name": "marketplace-servis",
+  "private": true,
+  "workspaces": ["frontend", "backend"],
+  "scripts": {
+    "dev": "npm run dev -w frontend",
+    "api": "npm run dev -w backend",
+    "db": "npm run setup -w backend",
+    "check": "npm run check --workspaces",
+    "build": "npm run build --workspaces",
+    "test:isolated": "npm run build && node backend/tests/isolated.mjs"
+  }
+}

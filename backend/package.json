@@ -1,0 +1,15 @@
+{
+  "name": "backend",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "start": "node dist/main.js",
+    "setup": "tsx src/setup.ts",
+    "import:postgres": "tsx src/import-postgres.ts",
+    "check": "tsc --noEmit",
+    "build": "tsc",
+    "test": "node tests/service.mjs"
+  },
+  "dependencies": { "express": "^5", "mongodb": "^6", "zod": "^4" },
+  "devDependencies": { "@types/express": "^5", "@types/node": "^22", "tsx": "^4", "typescript": "^5" }
+}
