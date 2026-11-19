@@ -10,7 +10,7 @@ const input = z.object({
   name:words(2,100),category:z.enum(['phone','laptop','phone_accessory','laptop_accessory']),
   condition:z.enum(['new','used']),description:words(10,600),
   price:z.number().int().min(1).max(100_000_000),stock:z.number().int().min(0).max(10000),
-  warranty_days:z.number().int().min(0).max(730),photo_url:z.url({ protocol:/^https$/ }).max(1500).nullable(),
+  warranty_days:z.number().int().min(0).max(730),photo_url:z.union([z.url({ protocol:/^https$/ }).max(1500),z.string().regex(/^\/api\/admin\/media\/[0-9a-f-]{36}\.(?:jpg|png|webp)$/i)]).nullable(),
   condition_notes:words(5,500).nullable(),
   inspection_notes:words(10,500).nullable().optional(),
 }).superRefine((product,context) => {

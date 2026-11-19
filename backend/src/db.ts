@@ -8,7 +8,8 @@ const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017'
 export const client = new MongoClient(uri,{ serverSelectionTimeoutMS:5000 })
 const db = client.db(process.env.MONGODB_DB || 'meja_servis')
 
-export type User = { _id: string; name: string; email: string; password: string; platform_admin: boolean }
+export type User = { _id: string; name: string; email: string; password: string; platform_admin: boolean; disabled?:boolean; created_at?:Date; photo_url?:string|null }
+export type TechnicianProfile = { _id:string; specialty:string; city:string; verified:boolean; created_at:Date; photo_url?:string|null }
 export type Member = { user_id: string; name: string; role: 'manager'|'technician'; specialty?: string }
 export type Service = { id: string; name: string; device: 'HP'|'Laptop'; starting_price: number; warranty_days: number }
 export type Shop = {
@@ -44,6 +45,7 @@ export type Product = {
 }
 export const products = db.collection<Product>('products')
 export const users = db.collection<User>('users')
+export const technicianProfiles = db.collection<TechnicianProfile>('technician_profiles')
 export const shops = db.collection<Shop>('shops')
 export const tickets = db.collection<Ticket>('tickets')
 export const notificationReads = db.collection<{ _id: string; read_at: Date }>('notification_reads')
@@ -52,6 +54,7 @@ export async function init() {
   await client.connect()
   await Promise.all([
     users.createIndex({ email:1 },{ unique:true }),
+    technicianProfiles.createIndex({ verified:1,created_at:-1 }),
     shops.createIndex({ 'members.user_id':1 }),
     shops.createIndex({ verified:1,name:1 }),
     products.createIndex({ published:1,created_at:-1 }),

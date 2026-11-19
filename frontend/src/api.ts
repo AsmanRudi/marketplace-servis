@@ -5,7 +5,7 @@ export type Shop = {
   technicians: { id: string; name: string; specialty: string }[]
 }
 export type ManagedShop = Shop & { role: string | null; verified: boolean; dropoff_address: string | null }
-export type Account = { id: string; name: string; platform_admin: boolean; memberships: { role: string; shop_id: string }[] }
+export type Account = { id: string; name: string; platform_admin: boolean; photo_url?:string|null; memberships: { role: string; shop_id: string }[] }
 export type Ticket = {
   id: string; shop_id: string; customer_id: string; shop_name: string; service_name: string; device: string;
   device_model: string; technician_id: string | null; preferred_id: string | null; technician_name: string | null;
@@ -24,12 +24,19 @@ export class ApiError extends Error {
   constructor(public status: number, message: string) { super(message) }
 }
 export async function api<T>(path: string, data?: object): Promise<T> {
-  const response = await fetch('/api' + path, data === undefined ? {} : {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
-  })
+  return apiMethod<T>(path,data===undefined?'GET':'POST',data)
+}
+export async function apiMethod<T>(path:string,method:'GET'|'POST'|'PUT'|'DELETE',data?:object):Promise<T> {
+  const response = await fetch('/api' + path, { method,credentials:'include',...(data===undefined?{}:{headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}) })
   const value = await response.json().catch(() => null)
   if (!response.ok) throw new ApiError(response.status, value?.message ?? 'Layanan sedang tidak tersedia. Coba lagi.')
   return value as T
+}
+export async function uploadPhoto(file:File):Promise<string> {
+  const response=await fetch('/api/admin/uploads',{method:'POST',credentials:'include',headers:{'Content-Type':file.type},body:file})
+  const value=await response.json().catch(()=>null)
+  if(!response.ok) throw new ApiError(response.status,value?.message??'Foto belum dapat diunggah.')
+  return String(value?.url??'')
 }
 export const money = (price: number) => new Intl.NumberFormat('id-ID',{ style:'currency', currency:'IDR', maximumFractionDigits:0 }).format(price)
 export const date = (value: string) => new Intl.DateTimeFormat('id-ID',{ dateStyle:'medium', timeStyle:'short' }).format(new Date(value))

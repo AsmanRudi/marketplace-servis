@@ -18,13 +18,13 @@ async function matches(password: string, hash: string) {
   return timingSafeEqual(await derive(password,salt,64) as Buffer,Buffer.from(value,'hex'))
 }
 const tokenOf = (req: Request) => req.headers.cookie?.match(/(?:^|;\s*)servis_session=([a-f0-9]{64})(?:;|$)/)?.[1]
-const view = (user: User) => ({ id:user._id,name:user.name,email:user.email,platform_admin:user.platform_admin })
+const view = (user: User) => ({ id:user._id,name:user.name,email:user.email,platform_admin:user.platform_admin,photo_url:user.photo_url ?? null })
 async function sessionUser(req: Request) {
   const token = tokenOf(req)
   if (!token) return null
   const active = await sessions.findOne({ _id:digest(token), expires_at:{ $gt:new Date() } })
   const user = active && await users.findOne({ _id:active.user_id })
-  return user ? view(user) : null
+  return user && !user.disabled ? view(user) : null
 }
 export async function actor(req: Request) {
   const user = await sessionUser(req)
@@ -43,7 +43,7 @@ const dummy = hashPassword('unused-placeholder')
 export const auth = Router()
 auth.post('/register',async (req,res) => {
   const input = parse(credentials.extend({ name:words(2,100) }),req.body)
-  const user = { ...input,_id:randomUUID(),password:await hashPassword(input.password),platform_admin:false }
+  const user = { ...input,_id:randomUUID(),password:await hashPassword(input.password),platform_admin:false,disabled:false,created_at:new Date() }
   try { await users.insertOne(user) }
   catch (error) {
     if ((error as { code?: number }).code === 11000) throw conflict('Akun dengan email tersebut sudah terdaftar.')
@@ -54,7 +54,7 @@ auth.post('/register',async (req,res) => {
 auth.post('/login',async (req,res) => {
   const input = parse(credentials,req.body)
   const user = await users.findOne({ email:input.email })
-  if (!(await matches(input.password,user?.password ?? await dummy)) || !user) throw new HttpError(401,'Email atau kata sandi salah.')
+  if (!(await matches(input.password,user?.password ?? await dummy)) || !user || user.disabled) throw new HttpError(401,'Email atau kata sandi salah.')
   await login(user,req,res)
 })
 auth.get('/me',async (req,res) => {

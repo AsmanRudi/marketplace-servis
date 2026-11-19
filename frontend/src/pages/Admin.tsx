@@ -55,11 +55,11 @@ export function Admin() {
       </section>
       <section id="verifikasi-toko" className="admin-card" aria-labelledby="admin-pengajuan">
         <div className="admin-section-head"><h2 id="admin-pengajuan" className="admin-heading">Pengajuan toko</h2>
-          <span className="design-flag">{overview.shops.pending} menunggu</span></div>
+          <div><span className="design-flag">{overview.shops.pending} menunggu</span> <a className="text-action" href="/admin/toko">Semua toko</a></div></div>
         {!overview.applications.length ? <p className="muted">Tidak ada toko yang menunggu verifikasi.</p>
           : <>
             <p className="muted">Menampilkan hingga 20 pengajuan terlama.</p>
-            <PagedList items={overview.applications} label="pengajuan toko" className="grid grid-cols-1 gap-3 md:grid-cols-2">{shop => <article className="admin-application" key={shop.id}>
+            <PagedList items={overview.applications} label="pengajuan toko" className="admin-verification-grid">{shop => <article className="admin-application admin-verification-card" key={shop.id}>
               <h3>{shop.name}</h3><p>{shop.district}, {shop.city}</p>
               {shop.dropoff_address && <p>{shop.dropoff_address}</p>}
               <p className="muted">{shop.description}</p><p className="muted">Diajukan {date(shop.created_at)}</p>
@@ -74,7 +74,7 @@ export function Admin() {
       </section>
       <div className="grid min-w-0 grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
         <section className="admin-card" id="ringkasan-tiket" aria-labelledby="admin-tiket">
-          <h2 id="admin-tiket" className="admin-heading">Status tiket servis</h2>
+          <div className="admin-section-head"><h2 id="admin-tiket" className="admin-heading">Status tiket servis</h2><a className="text-action" href="/admin/tiket">Lihat semua tiket</a></div>
           {!overview.tickets.by_status.length ? <p className="muted">Belum ada tiket tercatat.</p>
             : <ul className="admin-bars">{Object.keys(statuses).flatMap(status => {
               const row = overview.tickets.by_status.find(item => item.status === status)

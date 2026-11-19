@@ -19,6 +19,7 @@ out/
 !.env.*.example
 
 # Local databases and generated state
+backend/uploads/
 .pgdata/
 .legacy-postgres/
 .local-mongo/
@@ -52,6 +53,7 @@ prd.md
 PRD.md
 **/prd.md
 **/PRD.md
+.design-system/
 
 # Private local AI configuration (remove if intentionally shared)
 .claude/

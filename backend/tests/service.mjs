@@ -7,13 +7,13 @@ const suffix = randomBytes(5).toString('hex')
 const demoPassword = process.env.DEMO_PASSWORD
 assert(demoPassword, 'DEMO_PASSWORD diperlukan untuk database uji dengan data demo.')
 
-async function request(path, { cookie, body, status = 200 } = {}) {
+async function request(path, { cookie, body, status = 200, method } = {}) {
   const res = await fetch(base + path, {
-    method: body === undefined ? 'GET' : 'POST',
+    method: method ?? (body === undefined ? 'GET' : 'POST'),
     headers: { ...(cookie ? { Cookie: cookie } : {}), ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
-  const data = await res.json()
+  const data = res.status === 204 ? null : await res.json()
   assert.equal(res.status, status, path + ' ' + JSON.stringify(data))
   return { data, cookie: res.headers.get('set-cookie')?.split(';')[0] }
 }
@@ -39,7 +39,7 @@ const other = shops.find(s => s.name === 'Bengkel Laptop Dago')
 assert(shop && other)
 assert.equal((await request('/auth/me',{ cookie:manager })).data.memberships[0].role,'manager')
 assert(!shops.some(s => s.id === application.id))
-const product = { name:'Laptop Uji Bekas '+suffix,category:'laptop',condition:'used',description:'Unit untuk pengujian katalog.',price:2500000,stock:1,warranty_days:30,photo_url:null,condition_notes:'Kondisi baik, lengkap dengan pengisi daya.' }
+const product = { name:'Laptop Uji Bekas '+suffix,category:'laptop',condition:'used',description:'Unit untuk pengujian katalog.',price:2500000,stock:1,warranty_days:30,photo_url:'https://example.com/laptop-uji.jpg',condition_notes:'Kondisi baik, lengkap dengan pengisi daya.',inspection_notes:'Layar, keyboard, dan pengisian daya berfungsi.' }
 const productRoute = '/products/shops/'+shop.id
 await request(productRoute,{ cookie:otherManager,body:product,status:403 })
 await request(productRoute,{ cookie:manager,body:{...product,stock:2},status:400 })
@@ -119,6 +119,9 @@ const resolver = process.env.ADMIN_EMAIL ? (await request('/auth/login',{
 })).cookie : manager
 assert((await request('/cases',{ cookie:resolver })).data.some(item => item.ticket_id === order.id))
 if (process.env.ADMIN_EMAIL) {
+  const adminTickets=(await request('/admin/tickets',{cookie:resolver})).data
+  assert(adminTickets.some(item=>item.id===order.id))
+  assert(!('complaint' in adminTickets.find(item=>item.id===order.id)))
   const { data: dashboard }=await request('/admin/overview',{ cookie:resolver })
   const summary=dashboard.cases.recent.find(item => item.ticket_id === order.id)
   assert(summary && summary.status === 'in_review')
@@ -225,6 +228,51 @@ if (process.env.TEST_MIDTRANS_STATE) {
   assert.equal((await request(onlinePath,{ cookie:customer })).data.checkout_status,'review_required')
   await onlinePost('status',manager,{ status:'completed' },409)
   console.log('Lulus fixture Midtrans: pembatasan akses, pending, tanda tangan, nominal, notifikasi ulang, refund.')
+}
+if (process.env.ADMIN_EMAIL) {
+  const adminProducts=(await request('/admin/products',{ cookie:resolver })).data
+  const moderated=adminProducts.find(item=>item.id===addedProduct.id)
+  assert(moderated && !('password' in moderated))
+  await request('/admin/products',{ cookie:manager,status:403 })
+  await request('/admin/products/'+addedProduct.id+'/visibility',{ cookie:resolver,body:{published:true} })
+  assert((await request('/products')).data.some(item=>item.id===addedProduct.id))
+  await request('/admin/products/'+addedProduct.id+'/visibility',{ cookie:resolver,body:{published:false} })
+  const managedUsers=(await request('/admin/users',{ cookie:resolver })).data
+  assert(managedUsers.length && managedUsers.every(item=>!('password' in item)))
+  const protectedAdmin=managedUsers.find(item=>item.email==='admin@fixture.example')
+  assert(protectedAdmin?.platform_admin)
+  await request('/admin/users/'+protectedAdmin.id,{cookie:resolver,method:'PUT',body:{name:protectedAdmin.name,email:protectedAdmin.email,photo_url:'https://example.test/admin-profile.png'}})
+  assert((await request('/admin/users',{cookie:resolver})).data.some(item=>item.id===protectedAdmin.id&&item.photo_url==='https://example.test/admin-profile.png'))
+  await request('/admin/users/'+protectedAdmin.id+'/status',{ cookie:resolver,body:{disabled:true},status:409 })
+  const managedShops=(await request('/admin/shops',{ cookie:resolver })).data
+  assert(managedShops.some(item=>item.id===shop.id))
+  const managedTechs=(await request('/admin/technicians',{ cookie:resolver })).data
+  assert(managedTechs.some(item=>item.id===shop.technicians[0].id))
+  const independentEmail='independent'+suffix+'@test.example'
+  const independent=(await register('Teknisi Mandiri Uji','independent')).cookie
+  await request('/technicians/profile',{ cookie:independent,body:{specialty:'Perbaikan laptop',city:'Padang'},status:201 })
+  const pending=(await request('/admin/technicians',{ cookie:resolver })).data.find(item=>item.email===independentEmail)
+  assert(pending && !pending.verified && pending.kind==='independent')
+  await request('/admin/technicians/'+pending.id+'/verification',{ cookie:resolver,body:{verified:true} })
+  assert.equal((await request('/technicians/profile',{ cookie:independent })).data.verified,true)
+  await request('/admin/technicians/'+pending.id,{cookie:resolver,method:'PUT',body:{specialty:'Servis laptop',city:'Padang'}})
+  assert.equal((await request('/admin/technicians',{cookie:resolver})).data.find(item=>item.id===pending.id).specialty,'Servis laptop')
+  await request('/admin/technicians/'+pending.id,{cookie:resolver,method:'DELETE',status:204})
+  const newAdminUser=(await request('/admin/users',{cookie:resolver,body:{name:'Pengguna Admin Uji',email:'admin-user-'+suffix+'@test.example',password:'fixture-password-123',photo_url:'https://example.test/profile.png'},status:201})).data
+  await request('/admin/users/'+newAdminUser.id,{cookie:resolver,method:'PUT',body:{name:'Pengguna Diperbarui',email:'admin-user-'+suffix+'@test.example',photo_url:'https://example.test/profile-updated.png'}})
+  assert((await request('/admin/users',{cookie:resolver})).data.some(item=>item.id===newAdminUser.id&&item.name==='Pengguna Diperbarui'&&item.photo_url==='https://example.test/profile-updated.png'))
+  await request('/admin/users/'+newAdminUser.id,{cookie:resolver,method:'DELETE',status:204})
+  const newAdminShop=(await request('/admin/shops',{cookie:resolver,body:{name:'Toko Admin Uji',city:'Padang',district:'Kuranji',description:'Toko baru fixture admin',dropoff_address:'Alamat fixture untuk uji admin',photo_url:'https://example.test/shop.png',manager_email:'manager1@demo.example'},status:201})).data
+  await request('/admin/shops/'+newAdminShop.id,{cookie:resolver,method:'PUT',body:{name:'Toko Admin Diperbarui',city:'Padang',district:'Kuranji',description:'Toko baru fixture admin',dropoff_address:'Alamat fixture untuk uji admin',photo_url:'https://example.test/shop-updated.png'}})
+  assert((await request('/admin/shops',{cookie:resolver})).data.some(item=>item.id===newAdminShop.id&&item.name==='Toko Admin Diperbarui'&&item.photo_url==='https://example.test/shop-updated.png'))
+  await request('/admin/shops/'+newAdminShop.id,{cookie:resolver,method:'DELETE',status:204})
+  const newAdminProduct=(await request('/admin/products',{cookie:resolver,body:{shop_id:shop.id,name:'Produk admin fixture',category:'laptop',condition:'new',description:'Produk fixture untuk validasi CRUD admin',price:2500000,stock:3,warranty_days:30,photo_url:null,condition_notes:null,inspection_notes:null},status:201})).data
+  await request('/admin/products/'+newAdminProduct.id,{cookie:resolver,method:'PUT',body:{shop_id:shop.id,name:'Produk fixture diperbarui',category:'laptop',condition:'new',description:'Produk fixture untuk validasi CRUD admin',price:2600000,stock:2,warranty_days:30,photo_url:null,condition_notes:null,inspection_notes:null}})
+  await request('/admin/products/'+newAdminProduct.id,{cookie:resolver,method:'DELETE',status:204})
+  const target=managedUsers.find(item=>item.email==='stranger'+suffix+'@test.example')
+  assert(target)
+  await request('/admin/users/'+target.id+'/status',{ cookie:resolver,body:{disabled:true} })
+  await request('/auth/me',{cookie:stranger,status:200}).then(result=>assert.equal(result.data,null))
 }
 console.log('Lulus: booking, penugasan, batas toko, revisi dan persetujuan, pengerjaan, pembayaran tunggal sesuai tagihan, servis bebas biaya, serah terima, satu ulasan, kotak notifikasi privat, klaim garansi privat.')
 

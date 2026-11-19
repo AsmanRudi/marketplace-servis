@@ -9,13 +9,17 @@ import { Products } from './pages/Products'
 import { Cases } from './pages/Cases'
 import { Notifications } from './pages/Notifications'
 import { Admin } from './pages/Admin'
+import { AdminProducts } from './pages/AdminProducts'
+import { AdminTickets } from './pages/AdminTickets'
+import { AdminManagement } from './pages/AdminManagement'
+import { TechnicianStatus } from './pages/TechnicianStatus'
 import { AdminLayout } from './components/AdminLayout'
 import { Workspace } from './pages/Workspace'
 
-type Page = 'beranda' | 'toko' | 'servis' | 'mitra' | 'masuk' | 'pesan' | 'notifikasi' | 'kasus' | 'produk' | 'detail-produk' | 'keranjang' | 'admin' | 'workbench'
-const pages: Page[] = ['beranda','toko','servis','mitra','masuk','pesan','notifikasi','kasus','produk','detail-produk','keranjang','admin','workbench']
+type Page = 'beranda' | 'toko' | 'servis' | 'mitra' | 'masuk' | 'pesan' | 'notifikasi' | 'kasus' | 'produk' | 'detail-produk' | 'keranjang' | 'admin' | 'workbench' | 'teknisi'
+const pages: Page[] = ['beranda','toko','servis','mitra','masuk','pesan','notifikasi','kasus','produk','detail-produk','keranjang','admin','workbench','teknisi']
 export function readPage(): Page {
-  if (/^\/admin(?:\/kasus)?\/?$/.test(location.pathname)) return 'admin'
+  if (/^\/admin(?:\/[^/]+)?\/?$/.test(location.pathname)) return 'admin'
   const hash = new URLSearchParams(location.search).get('halaman') as Page
   return pages.includes(hash) ? hash : 'beranda'
 }
@@ -35,17 +39,19 @@ export function App() {
   const [ticket,setTicket] = useState('')
   const [next,setNext] = useState<Page | null>(null)
   async function refreshAccount() {
-    try {
-      const current = await api<Account | null>('/auth/me')
-      setAccount(current)
-      setNotice('')
-      return current
+    for(let attempt=0;attempt<8;attempt++) {
+      try {
+        const current = await api<Account | null>('/auth/me')
+        if(current || attempt===7) {
+          setAccount(current)
+          setNotice('')
+          return current
+        }
+      } catch { /* Retry while the local API finishes starting. */ }
+      await new Promise(resolve => window.setTimeout(resolve,250))
     }
-    catch {
-      setAccount(null)
-      setNotice('Koneksi ke layanan belum tersedia.')
-      return null
-    }
+    setAccount(null)
+    return null
   }
   function loadShops() {
     setCatalog('loading')
@@ -68,16 +74,18 @@ export function App() {
     catch { setNotice('Gagal keluar. Coba lagi.') }
   }
   if (page === 'admin') {
-    const isCases = /^\/admin\/kasus\/?$/.test(location.pathname)
-    return <AdminLayout authorized={account?.platform_admin === true} cases={isCases} onLogout={logout}>
+    const route = location.pathname.replace(/\/$/,'')
+    const adminSection = route === '/admin/kasus' ? 'cases' : route === '/admin/tiket' ? 'tickets' : route === '/admin/produk' ? 'products' : route === '/admin/pengguna' ? 'users' : route === '/admin/toko' ? 'shops' : route === '/admin/teknisi' ? 'technicians' : 'dashboard'
+    return <AdminLayout authorized={account?.platform_admin === true} section={adminSection} onLogout={logout}>
       {notice && <p className="wrap error" role="status">{notice}</p>}
-      {account?.platform_admin ? (isCases ? <Cases admin/> : <Admin/>)
+      {account?.platform_admin ? (adminSection === 'cases' ? <Cases admin/> : adminSection === 'tickets' ? <AdminTickets/> : adminSection === 'products' ? <AdminProducts/> : ['users','shops','technicians'].includes(adminSection) ? <AdminManagement section={adminSection as 'users'|'shops'|'technicians'}/> : <Admin/>)
         : account === undefined ? <p className="wrap page" role="status">Memeriksa sesi admin…</p>
         : account ? <section className="wrap page narrow"><h1>Dashboard admin</h1>
           <p>Akun ini tidak memiliki akses admin.</p><a className="button" href="/">Kembali ke beranda</a></section>
-        : <SignIn adminOnly onDone={async () => {
-          const current = await refreshAccount()
-          if (!current) throw new Error('Sesi masuk belum dapat diverifikasi.')
+        : <SignIn adminOnly onDone={async signedIn => {
+          if (!signedIn.platform_admin) throw new Error('Akun ini tidak memiliki akses admin platform.')
+          setAccount({ ...signedIn,memberships:[] })
+          void api<Account>('/auth/me').then(current => { if (current) setAccount(current) }).catch(() => {})
         }}/>
       }
     </AdminLayout>
@@ -105,10 +113,10 @@ export function App() {
       {page === 'pesan' && (selected
         ? <Booking shop={selected} account={account} signIn={() => requireAccount('pesan')} onCreated={id => { setTicket(id); go('servis') }}/>
         : <div className="wrap page"><h1>Pilih toko servis</h1><a className="button" href="?halaman=toko">Lihat daftar toko</a></div>)}
-      {page === 'masuk' && <SignIn onDone={async () => {
-        const current = await refreshAccount()
-        if (!current) throw new Error('Sesi masuk belum dapat diverifikasi.')
-        go(next ?? (current.platform_admin ? 'admin' : 'servis'))
+      {page === 'masuk' && <SignIn onDone={async (signedIn,technician) => {
+        setAccount({ ...signedIn,memberships:[] })
+        void api<Account>('/auth/me').then(current => { if (current) setAccount(current) }).catch(() => {})
+        go(technician ? 'teknisi' : next ?? (signedIn.platform_admin ? 'admin' : 'servis'))
         setNext(null)
       }}/>}
       {page === 'servis' && (account
@@ -119,6 +127,7 @@ export function App() {
         : account
           ? <section className="wrap page narrow"><h1>Meja kerja teknisi</h1><p>Halaman ini tersedia untuk teknisi terdaftar.</p></section>
           : <LoginPrompt title="Meja kerja teknisi" loading={account === undefined} onClick={() => requireAccount('workbench')}/>)}
+      {page === 'teknisi' && (account ? <TechnicianStatus/> : <LoginPrompt title="Status teknisi" loading={account === undefined} onClick={() => requireAccount('teknisi')}/>)}
       {page === 'notifikasi' && (account
         ? <Notifications openTicket={id => { setTicket(id); go('servis') }}/>
         : <LoginPrompt title="Notifikasi servis" loading={account === undefined} onClick={() => requireAccount('notifikasi')}/>)}

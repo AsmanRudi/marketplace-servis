@@ -55,21 +55,33 @@ try {
     assert.equal(booked.status,201)
   }
   for(const [role,email,routes] of [
+    ['admin',env.ADMIN_EMAIL,['/admin','/admin/kasus','/admin/tiket','/admin/produk','/admin/pengguna','/admin/toko','/admin/teknisi']],
     ['customer',customerEmail,['/?halaman=servis','/?halaman=notifikasi','/?halaman=kasus']],
     ['manager','manager1@demo.example',['/?halaman=mitra','/?halaman=servis','/?halaman=kasus']],
     ['technician','technician1@demo.example',['/?halaman=workbench','/?halaman=servis']],
-    ['admin',env.ADMIN_EMAIL,['/admin','/admin/kasus']],
   ]){
-    const login=await fetch(env.TEST_API_URL+'/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:role==='admin'?env.ADMIN_PASSWORD:env.DEMO_PASSWORD})})
-    assert.equal(login.status,201)
-    const cookie=login.headers.get('set-cookie').split(';')[0];const split=cookie.indexOf('=')
-    await call('Network.setCookie',{name:cookie.slice(0,split),value:cookie.slice(split+1),url:'http://127.0.0.1:5185',httpOnly:true})
+    if(role==='admin') {
+      await call('Page.navigate',{url:'http://127.0.0.1:5185/admin'})
+      for(let i=0;i<80;i++){if(await evaluate("!!document.querySelector('.login-form input[type=password]')"))break;await pause(100)}
+      await evaluate(`(()=>{const fields=[...document.querySelectorAll('.login-form input')];const set=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;for(const [input,value] of [[fields[0],${JSON.stringify(email)}],[fields[1],${JSON.stringify(env.ADMIN_PASSWORD)}]]){set.call(input,value);input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}))}document.querySelector('.login-form').requestSubmit()})()`)
+      for(let i=0;i<80;i++){if(await evaluate("!!document.querySelector('.admin-sidebar nav') && !document.querySelector('.login-form input[type=password]')"))break;await pause(100)}
+      assert(await evaluate("!!document.querySelector('.admin-sidebar nav')"),'Admin sign-in UI did not open the dashboard')
+    } else {
+      const login=await fetch(env.TEST_API_URL+'/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:env.DEMO_PASSWORD})})
+      assert.equal(login.status,201)
+      const cookie=login.headers.get('set-cookie').split(';')[0];const split=cookie.indexOf('=')
+      await call('Network.setCookie',{name:cookie.slice(0,split),value:cookie.slice(split+1),url:'http://127.0.0.1:5185',path:'/api',httpOnly:true})
+    }
     for(const route of routes){
       await call('Page.navigate',{url:'http://127.0.0.1:5185'+route})
-      for(let i=0;i<80;i++){if(await evaluate("!!document.querySelector('h1') && !document.body.innerText.includes('Memuat')"))break;await pause(100)}
+      for(let i=0;i<80;i++){if(role==='customer'&&route==='/?halaman=servis'?await evaluate("document.querySelectorAll('.ticket-row').length===6"):await evaluate("!!document.querySelector('h1') && !document.querySelector('.login-prompt, .login-page') && !document.body.innerText.includes('Memuat')"))break;await pause(100)}
+      if(role==='customer'&&route==='/?halaman=servis'&&!(await evaluate("document.querySelectorAll('.ticket-row').length===6"))){
+        await call('Page.reload',{ignoreCache:true})
+        for(let i=0;i<80;i++){if(await evaluate("document.querySelectorAll('.ticket-row').length===6"))break;await pause(100)}
+      }
       for(const width of [390,768,1440]){
         await call('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:false});await pause(450)
-        const result=await evaluate("({heading:document.querySelector('h1')?.textContent,overflow:document.documentElement.scrollWidth>innerWidth,login:!!document.querySelector('input[type=password]')})")
+        const result=await evaluate("({heading:document.querySelector('h1')?.textContent,overflow:document.documentElement.scrollWidth>innerWidth,login:!!document.querySelector('.login-prompt, .login-page')})")
         assert(result.heading&&!result.login,role+' did not authenticate');assert(!result.overflow,role+' overflow '+width)
         console.log('Browser PASS',role,route,width,result.heading)
       }

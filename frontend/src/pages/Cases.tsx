@@ -24,13 +24,13 @@ export function Cases({ admin = false }: { admin?:boolean }) {
     else void api<Case[]>('/cases').then(items => { if (active) setList(items) },failed)
     return () => { active=false }
   },[ticket])
-  return <section className="wrap page narrow">
+  return <section className={'wrap page '+(admin?'admin-management admin-cases':'narrow')}>
     <a className="back" href={ticket ? listUrl : admin ? '/admin' : '/?halaman=servis'}>{ticket ? '← Daftar kasus' : admin ? '← Dashboard admin' : '← Lacak servis'}</a>
     <h1>{detail ? title(detail) : 'Kasus servis'}</h1>
     {error && <p className="error" role="alert">{error}</p>}
     {!error && !detail && list === null && <p role="status">Memuat kasus…</p>}
     {list?.length === 0 && <p>Belum ada komplain atau klaim garansi.</p>}
-    {list && <PagedList items={list} label="kasus servis">{item => <article className="panel" key={item.ticket_id}>
+    {list && <PagedList items={list} label="kasus servis" className={admin?'admin-case-grid':'grid gap-4'}>{item => <article className={admin?'admin-case-card':'panel'} key={item.ticket_id}>
       <span className="status">{statuses[item.case.status]}</span>
       <h2>{title(item)}</h2><p>{item.device_model} · {item.shop_name}</p>
       <a className="button" href={listUrl+(admin ? '?' : '&')+'tiket='+encodeURIComponent(item.ticket_id)}>Buka kasus</a>
@@ -38,11 +38,11 @@ export function Cases({ admin = false }: { admin?:boolean }) {
     {detail && <>
       <p>{detail.device_model} · {detail.shop_name}</p>
       <span className="status">{statuses[detail.case.status]}</span>
-      {detail.case.messages.map((entry,index) => <article className="panel" key={index}>
+      {detail.case.messages.map((entry,index) => <article className={admin?'panel admin-case-message':'panel'} key={index}>
         <h2>{roles[entry.role]}</h2><p className="muted">{date(entry.created_at)}</p><p>{entry.message}</p>
       </article>)}
       {detail.case.status !== 'resolved' &&
-        <ActionForm className="panel" label="Kirim tanggapan" onSend={async (form,event) => {
+        <ActionForm className={'panel'+(admin?' admin-case-reply':'')} label="Kirim tanggapan" onSend={async (form,event) => {
           const formElement = event.currentTarget ?? event.target as HTMLFormElement
           await api('/cases/'+detail.ticket_id+'/reply',{ message:field(form,'message'),status:field(form,'status') || undefined })
           setDetail(await api<Case>('/cases/'+detail.ticket_id))

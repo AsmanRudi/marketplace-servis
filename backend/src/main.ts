@@ -8,6 +8,7 @@ import { notifications } from './notifications'
 import { productRoutes } from './products'
 import { orderRoutes } from './orders'
 import { shopRoutes } from './shops'
+import { technicianRoutes } from './technicians'
 
 async function main() {
   await init()
@@ -37,6 +38,7 @@ async function main() {
   app.use('/api/auth',auth)
   app.use('/api/admin',adminRoutes)
   app.use('/api/shops',shopRoutes)
+  app.use('/api/technicians',technicianRoutes)
   app.use('/api/orders',orderRoutes)
   app.use('/api/products',productRoutes)
   app.use('/api/cases',cases)

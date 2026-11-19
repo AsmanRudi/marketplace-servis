@@ -1,12 +1,13 @@
 import { useState } from 'react'
-import { api } from '../api'
+import { api, type Account } from '../api'
 import { ActionForm, field } from '../components/ActionForm'
 
 export function LoginPrompt({ title, loading, onClick }: { title: string; loading: boolean; onClick: () => void }) {
   return <section className="wrap page narrow login-prompt"><span className="login-eyebrow">MEJA SERVIS · RUANG PELANGGAN</span><h1>{title}</h1>{loading ? <p role="status">Memeriksa sesiâ€¦</p> : <><p>Masuk untuk melihat perjalanan servis, pembaruan dari toko, dan riwayat perangkatmu.</p><button onClick={onClick} className="button">Masuk ke akun <span aria-hidden="true">→</span></button></>}</section>
 }
-export function SignIn({ onDone, adminOnly = false }: { onDone: () => Promise<void>; adminOnly?: boolean }) {
+export function SignIn({ onDone, adminOnly = false }: { onDone: (account:Account,technician?:boolean) => Promise<void>; adminOnly?: boolean }) {
   const [register,setRegister] = useState(false)
+  const [technicianRegister,setTechnicianRegister] = useState(false)
   return <section className={'wrap page login-page'+(adminOnly ? ' login-admin' : '')}>
     <div className="login-card">
       <aside className="login-aside">
@@ -23,18 +24,23 @@ export function SignIn({ onDone, adminOnly = false }: { onDone: () => Promise<vo
         <div className="login-form-heading">
           <span className="login-eyebrow">{adminOnly ? 'AKSES TERBATAS' : register ? 'MULAI DI SINI' : 'SENANG MELIHATMU KEMBALI'}</span>
           <h1>{adminOnly ? 'Masuk sebagai admin' : register ? 'Buat akun baru' : 'Masuk ke akun'}</h1>
-          <p>{adminOnly ? 'Gunakan akun admin platform yang terdaftar.' : register ? 'Buat akun untuk mulai mengelola servis dan pesananmu.' : 'Masukkan detail akun untuk melanjutkan.'}</p>
+          <p>{adminOnly ? 'Gunakan akun admin platform yang terdaftar.' : register ? technicianRegister ? 'Daftar sebagai teknisi perorangan. Profil akan ditinjau admin sebelum dapat bergabung ke toko.' : 'Buat akun untuk mulai mengelola servis dan pesananmu.' : 'Masukkan detail akun untuk melanjutkan.'}</p>
         </div>
         <ActionForm key={String(register)} label={register ? 'Buat akun' : 'Masuk'} className="login-form" onSend={async form => {
           const email = field(form,'email'), password = field(form,'password')
-          await api('/auth/' + (register ? 'register' : 'login'), register ? { email,password,name:field(form,'name') } : { email,password })
-          await onDone()
+          const signedIn = await api<Account>('/auth/' + (register ? 'register' : 'login'), register ? { email,password,name:field(form,'name') } : { email,password })
+          if (register && technicianRegister) await api('/technicians/profile',{ specialty:field(form,'specialty'),city:field(form,'city') })
+          await onDone(signedIn,register&&technicianRegister)
         }}>
           {register && <label>Nama<input name="name" autoComplete="name" minLength={2} maxLength={100} placeholder="Nama lengkap" required/></label>}
+          {register && technicianRegister && <><label>Keahlian utama<input name="specialty" minLength={2} maxLength={100} placeholder="Contoh: servis ponsel" required/></label><label>Kota domisili<input name="city" minLength={2} maxLength={80} placeholder="Kota" required/></label></>}
           <label>Email<input name="email" type="email" autoComplete="email" maxLength={254} placeholder="nama@email.com" required/></label>
           <label>Kata sandi<input name="password" type="password" autoComplete={register ? 'new-password' : 'current-password'} minLength={10} maxLength={128} placeholder="Minimal 10 karakter" required/></label>
         </ActionForm>
-        {!adminOnly && <p className="login-switch">{register ? 'Sudah punya akun?' : 'Belum punya akun?'} <button className="link" onClick={() => setRegister(!register)}>{register ? 'Masuk di sini' : 'Daftar sekarang'}</button></p>}
+        {!adminOnly && <>
+          {register && <div className="login-account-type" role="group" aria-label="Jenis pendaftaran"><span>Daftar sebagai</span><button type="button" aria-pressed={!technicianRegister} onClick={() => setTechnicianRegister(false)}>Pelanggan</button><button type="button" aria-pressed={technicianRegister} onClick={() => setTechnicianRegister(true)}>Teknisi perorangan</button></div>}
+          <p className="login-switch">{register ? 'Sudah punya akun?' : 'Belum punya akun?'} <button className="link" onClick={() => setRegister(!register)}>{register ? 'Masuk di sini' : 'Daftar sekarang'}</button></p>
+        </>}
         <p className="login-privacy">Dengan masuk, akunmu tetap aman dan hanya dapat melihat data milikmu.</p>
       </div>
     </div>

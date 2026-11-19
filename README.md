@@ -79,7 +79,7 @@ Pemeriksaan awal mendeteksi dokumen berbeda dengan ID yang sama atau email yang 
 
 ## Dashboard admin
 
-Masuk sebagai super admin di **/admin** untuk melihat toko, status tiket, kasus aktif, dan antrean verifikasi. Kasus admin tersedia di **/admin/kasus** dalam panel yang sama. Angka berasal dari database yang sedang digunakan, termasuk toko demo jika ada.
+Masuk sebagai super admin di **/admin** untuk melihat toko, status tiket, kasus aktif, dan antrean verifikasi. Navigasi admin menyediakan dashboard, verifikasi toko, ringkasan tiket, kasus servis, dan **Kelola produk** di **/admin/produk**. Menu produk dapat mencari serta memfilter listing lintas toko dan menampilkan atau menyembunyikan produk dari katalog. Angka berasal dari database yang sedang digunakan, termasuk toko demo jika ada.
 
 ## Kasus, notifikasi, dan Midtrans sandbox
 
